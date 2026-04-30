@@ -10,12 +10,12 @@ def test_wavenumber_15ghz():
 
 
 def test_te10_profile_endpoints_zero():
-    assert te10_profile(np.array([0.0, 0.51]), b=0.51) == pytest.approx([0.0, 0.0], abs=1e-12)
+    assert te10_profile(np.array([0.0, 1.5]), b=1.5) == pytest.approx([0.0, 0.0], abs=1e-12)
 
 
 def test_te10_profile_peak_at_midline():
-    assert te10_profile(np.array([0.255]), b=0.51)[0] == pytest.approx(1.0, rel=1e-6)
+    assert te10_profile(np.array([0.75]), b=1.5)[0] == pytest.approx(1.0, rel=1e-6)
 
 
 def test_te10_norm_is_b_over_2():
-    assert te10_norm(b=0.51) == pytest.approx(0.255, rel=1e-12)
+    assert te10_norm(b=1.5) == pytest.approx(0.75, rel=1e-12)

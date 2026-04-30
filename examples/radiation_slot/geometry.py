@@ -9,12 +9,17 @@ import deepxde as dde
 class RadiationSlotGeometry:
     """All lengths in cm. 2D domain = waveguide ∪ buffer (above the slot opening).
 
-    NOTE: ``waveguide_width`` here is the length along the wave propagation
-    direction (x in 2D). ``waveguide_height`` is the TE10 cutoff dimension
-    (physical b).
+    Dimension naming (post M2 review):
+        ``waveguide_width``  is the length along the propagation direction (x in 2D).
+        ``waveguide_height`` is the cross-section dimension that determines TE10
+        cutoff. For TE10 to propagate at frequency f, we need
+        ``waveguide_height > c/(2 f) = 1 cm at 15 GHz``. Default 1.5 cm gives
+        kx ≈ 2.34 rad/cm and a guided wavelength λ_g ≈ 2.68 cm at 15 GHz, so a
+        4 cm long waveguide hosts ~1.5 periods — enough to see standing-wave
+        structure produced by the slot.
     """
     waveguide_width: float = 4.0
-    waveguide_height: float = 0.51
+    waveguide_height: float = 1.5
     slot_length: float = 1.5
     slot_width: float = 0.16
     slot_position: float = 0.5

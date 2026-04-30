@@ -1,6 +1,6 @@
 geometry:
   waveguide_width: 4.0
-  waveguide_height: 0.51
+  waveguide_height: 1.5      # cm — TE10 cutoff dimension; 1.5 cm gives kx ≈ 2.34 rad/cm at 15 GHz
   slot_length: 1.5
   slot_width: 0.16
   slot_position: 0.5
