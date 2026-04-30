@@ -23,3 +23,4 @@ deepxde/_version.py
 
 # PyCharm
 .idea/
+.worktrees/
