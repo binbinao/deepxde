@@ -53,15 +53,74 @@ class PINNSolver:
 
     # --------------------------------------------------------------- BCs
     def _build_bcs(self):
-        """PEC-only stub. Full Mur+TE10 BC set is added in Task 13."""
+        """PEC + port_in (TE10 + Mur) + port_out (Mur) + radiation (Mur) BCs.
+
+        Mur on outward normal n̂:  ∂Ez/∂n + j k0 Ez = 0
+        Decomposed (Ez = u + j v):
+            ∂u/∂n =  k0 v
+            ∂v/∂n = -k0 u
+
+        port_in (outward normal n̂ = -x̂) carries the TE10 incident wave:
+            ∂Ez/∂x − j k0 Ez = -2 j k0 sin(πy/b)
+        Switching to outward-normal form (∂/∂n = -∂/∂x) and decomposing:
+            ∂u/∂n = -k0 v
+            ∂v/∂n =  k0 u + 2 k0 sin(πy/b)
+        """
         g = self.geometry
+        k0 = self.k0
+        b_h = g.waveguide_height
+        pi_over_b = float(np.pi / b_h)
+
+        def label_of(x):
+            return g.boundary_marker(np.atleast_2d(x))[0]
 
         def on_pec(x, on_boundary):
-            return on_boundary and g.boundary_marker(np.atleast_2d(x))[0] == "pec"
+            return on_boundary and label_of(x) == "pec"
+
+        def on_port_in(x, on_boundary):
+            return on_boundary and label_of(x) == "port_in"
+
+        def on_port_out(x, on_boundary):
+            return on_boundary and label_of(x) == "port_out"
+
+        def on_radiation(x, on_boundary):
+            return on_boundary and label_of(x) == "radiation"
+
+        # PEC
+        pec_re = dde.icbc.DirichletBC(self.geom, lambda x: 0.0, on_pec, component=0)
+        pec_im = dde.icbc.DirichletBC(self.geom, lambda x: 0.0, on_pec, component=1)
+
+        # port_in: TE10 + Mur (outward normal -x̂)
+        # NOTE: dde.icbc.RobinBC calls value_func(X, outputs) where X is a NUMPY
+        # array (boundary coordinates) and outputs is a backend TENSOR. So we
+        # use np.sin on x[:, 1:2] and let paddle/torch broadcast-add it to the
+        # tensor expression involving y.
+        def port_in_re(x, y):
+            return -k0 * y[:, 1:2]
+
+        def port_in_im(x, y):
+            return k0 * y[:, 0:1] + 2.0 * k0 * np.sin(pi_over_b * x[:, 1:2])
+
+        port_in_bc_re = dde.icbc.RobinBC(self.geom, port_in_re, on_port_in, component=0)
+        port_in_bc_im = dde.icbc.RobinBC(self.geom, port_in_im, on_port_in, component=1)
+
+        # port_out + radiation: ∂u/∂n = k0 v, ∂v/∂n = -k0 u
+        def mur_re(x, y):
+            return k0 * y[:, 1:2]
+
+        def mur_im(x, y):
+            return -k0 * y[:, 0:1]
+
+        port_out_re = dde.icbc.RobinBC(self.geom, mur_re, on_port_out, component=0)
+        port_out_im = dde.icbc.RobinBC(self.geom, mur_im, on_port_out, component=1)
+        rad_re = dde.icbc.RobinBC(self.geom, mur_re, on_radiation, component=0)
+        rad_im = dde.icbc.RobinBC(self.geom, mur_im, on_radiation, component=1)
 
         return [
-            dde.icbc.DirichletBC(self.geom, lambda x: 0.0, on_pec, component=0),
-            dde.icbc.DirichletBC(self.geom, lambda x: 0.0, on_pec, component=1),
+            pec_re, pec_im,
+            port_in_bc_re, port_in_bc_im,
+            port_out_re, port_out_im,
+            rad_re, rad_im,
         ]
 
     # --------------------------------------------------------------- training
