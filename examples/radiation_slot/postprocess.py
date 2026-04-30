@@ -25,3 +25,26 @@ def s_parameters(Ez, X, Y, geometry, k0) -> tuple[complex, complex]:
     cols_out = _column_indices(X, geometry.waveguide_width)
     s21 = np.trapz(Ez[j_wg, cols_out[0]] * np.conj(phi), y_wg) / N
     return complex(s11), complex(s21)
+
+
+def near_to_far_field(Ez_aperture, x_aperture, k0, theta) -> np.ndarray:
+    """2D Stratton-Chu approximation:
+        E_far(θ) ∝ ∫ Ez(x) exp(-j k0 x sinθ) dx
+
+    Returns complex pattern of shape (Nθ,).
+    """
+    sin_t = np.sin(theta)[:, None]
+    kernel = np.exp(-1j * k0 * x_aperture[None, :] * sin_t)
+    return np.trapz(kernel * Ez_aperture[None, :], x_aperture, axis=1)
+
+
+def aperture_field(Ez, X, Y, geometry):
+    """Slice the field at y = waveguide_height, x ∈ [slot_lo, slot_hi].
+
+    Returns (x_aperture, Ez_aperture).
+    """
+    b = geometry.waveguide_height
+    j = int(np.argmin(np.abs(Y[:, 0] - b)))
+    x_lo, x_hi = geometry.slot_x_range()
+    cols = np.where((X[j, :] >= x_lo - 1e-9) & (X[j, :] <= x_hi + 1e-9))[0]
+    return X[j, cols], Ez[j, cols]
