@@ -27,3 +27,22 @@ def test_build_bcs_returns_full_set():
     classes = {type(b).__name__ for b in bcs}
     assert "DirichletBC" in classes
     assert "RobinBC" in classes
+
+
+def test_predict_on_grid_shape():
+    import numpy as np
+    g = RadiationSlotGeometry()
+    solver = PINNSolver(g, frequency_ghz=15.0, num_domain=200, num_boundary=40, num_test=200)
+    solver.train(iterations=10, lr=1e-3)
+    X, Y, mask = g.fdfd_grid(0.2)
+    Ez = solver.predict_on_grid(X, Y, mask)
+    assert Ez.shape == X.shape
+    assert np.iscomplexobj(Ez)
+
+
+def test_lbfgs_finetune_runs():
+    g = RadiationSlotGeometry()
+    solver = PINNSolver(g, frequency_ghz=15.0, num_domain=200, num_boundary=40, num_test=200)
+    solver.train(iterations=10, lr=1e-3)
+    solver.finetune_lbfgs(max_iter=20)
+    assert solver.model is not None

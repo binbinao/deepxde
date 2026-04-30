@@ -156,3 +156,21 @@ class PINNSolver:
             display_every=max(1, iterations // 10),
             model_save_path=save_path,
         )
+
+    # --------------------------------------------------------------- L-BFGS fine-tune
+    def finetune_lbfgs(self, max_iter: int = 5000):
+        """Switch optimizer to L-BFGS and run until convergence."""
+        dde.optimizers.config.set_LBFGS_options(maxiter=max_iter)
+        self.model.compile("L-BFGS")
+        return self.model.train()
+
+    # --------------------------------------------------------------- prediction
+    def predict_on_grid(self, X, Y, mask) -> np.ndarray:
+        """Predict Ez on a Cartesian grid; outside-mask cells set to NaN."""
+        pts = np.column_stack([X.ravel(), Y.ravel()]).astype(np.float32)
+        y = self.model.predict(pts)
+        u = y[:, 0].reshape(X.shape).astype(np.float64)
+        v = y[:, 1].reshape(X.shape).astype(np.float64)
+        Ez = (u + 1j * v).astype(np.complex128)
+        Ez[~mask] = np.nan
+        return Ez
