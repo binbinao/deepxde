@@ -60,8 +60,15 @@ class RadiationSlotGeometry:
         """Classify points (N, 2) into one of:
         ``{'port_in', 'port_out', 'pec', 'radiation', 'interior'}``.
 
-        Order of precedence: ports first (so they win over PEC at the bottom
-        corners), then PEC walls, then radiation. Anything else is interior.
+        Order of precedence (later wins):
+            1. PEC walls
+            2. Radiation walls (buffer side + buffer top + slot-edge corners on
+               the waveguide top, where the field is *not* bounded by metal)
+            3. Ports (so the ports win over PEC at the bottom/top inlet corners)
+
+        With this ordering every boundary point of the CSG domain falls in exactly
+        one of {port_in, port_out, pec, radiation}, and `interior` is reserved
+        only for non-boundary inputs.
         """
         x = np.atleast_2d(x)
         labels = np.full(x.shape[0], "interior", dtype=object)
@@ -79,21 +86,25 @@ class RadiationSlotGeometry:
         in_wg_y = (x[:, 1] >= -atol) & (x[:, 1] <= wg_h + atol)
         in_buf_x = (x[:, 0] >= slot_lo - atol) & (x[:, 0] <= slot_hi + atol)
 
-        # Ports — left/right vertical edges of the waveguide only.
-        labels[on_x0 & in_wg_y] = "port_in"
-        labels[on_xL & in_wg_y] = "port_out"
-
-        # PEC — waveguide top/bottom (excluding slot opening) + buffer side walls vs.
-        # 'radiation' below; here we only paint waveguide walls.
+        # 1. PEC: waveguide bottom + waveguide top excluding the slot opening
         bottom = on_y0 & (x[:, 0] >= -atol) & (x[:, 0] <= wg_w + atol)
         top_left = on_yh & (x[:, 0] < slot_lo - atol)
         top_right = on_yh & (x[:, 0] > slot_hi + atol)
         labels[bottom | top_left | top_right] = "pec"
 
-        # Radiation — buffer top wall + buffer left/right vertical walls.
-        on_buf_left = np.isclose(x[:, 0], slot_lo, atol=atol) & (x[:, 1] > wg_h + atol)
-        on_buf_right = np.isclose(x[:, 0], slot_hi, atol=atol) & (x[:, 1] > wg_h + atol)
+        # 2. Radiation:
+        #    a) buffer top wall (y = buf_top, slot_lo ≤ x ≤ slot_hi)
+        #    b) buffer side walls (x = slot_lo / slot_hi, wg_h ≤ y ≤ buf_top)
+        #       — include y = wg_h so the slot-edge corners belong to "radiation"
+        #         instead of leaking into "interior".
+        on_buf_left = np.isclose(x[:, 0], slot_lo, atol=atol) & (x[:, 1] >= wg_h - atol) & (x[:, 1] <= buf_top + atol)
+        on_buf_right = np.isclose(x[:, 0], slot_hi, atol=atol) & (x[:, 1] >= wg_h - atol) & (x[:, 1] <= buf_top + atol)
         on_buf_top = on_yt & in_buf_x
         labels[on_buf_left | on_buf_right | on_buf_top] = "radiation"
+
+        # 3. Ports — paint LAST so they win at the inlet/outlet corners that
+        #    PEC would otherwise have claimed.
+        labels[on_x0 & in_wg_y] = "port_in"
+        labels[on_xL & in_wg_y] = "port_out"
 
         return labels

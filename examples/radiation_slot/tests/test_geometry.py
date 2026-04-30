@@ -53,5 +53,28 @@ def test_boundary_marker_pec_radiation_disjoint():
     g = RadiationSlotGeometry()
     pts = g.build_dde_geometry().random_boundary_points(500)
     labels = g.boundary_marker(pts)
-    assert not ((labels == "pec") & (labels == "radiation")).any()
+    # Every random boundary point must land in one of the four boundary
+    # categories — none should be classified as 'interior'. This is the real
+    # disjointness/coverage check (a single label cell can never simultaneously
+    # equal two distinct strings, so no per-cell intersection is needed).
     assert (labels != "interior").all()
+
+
+def test_boundary_marker_corners_resolve_to_ports():
+    """Inlet/outlet corners must be classified as ports (not PEC)."""
+    g = RadiationSlotGeometry()
+    corners = np.array([
+        [0.0, 0.0], [0.0, g.waveguide_height],
+        [g.waveguide_width, 0.0], [g.waveguide_width, g.waveguide_height],
+    ])
+    labels = g.boundary_marker(corners).tolist()
+    assert labels == ["port_in", "port_in", "port_out", "port_out"]
+
+
+def test_boundary_marker_slot_edge_corners_are_radiation():
+    """The slot edge corners (slot_lo, wg_h) and (slot_hi, wg_h) must be
+    classified as 'radiation' — they bound the open buffer, not metal."""
+    g = RadiationSlotGeometry()
+    slot_lo, slot_hi = g.slot_x_range()
+    edges = np.array([[slot_lo, g.waveguide_height], [slot_hi, g.waveguide_height]])
+    assert g.boundary_marker(edges).tolist() == ["radiation", "radiation"]
