@@ -31,3 +31,27 @@ def test_fdfd_grid_shape_and_mask():
     # Allow ~10% tolerance: discrete cells include slot edges + grid does not
     # divide waveguide_height (0.51) evenly at mesh_size 0.05.
     assert area_grid == pytest.approx(area_true, rel=0.10)
+
+
+def test_boundary_marker_basic_labels():
+    g = RadiationSlotGeometry()
+    pts = np.array([
+        [0.0, 0.25],                                    # port_in
+        [g.waveguide_width, 0.25],                      # port_out
+        [2.0, 0.0],                                     # pec (waveguide bottom)
+        [0.5, g.waveguide_height],                      # pec (top wall, NOT under slot)
+        [2.0, g.waveguide_height + g.buffer_height],    # radiation (buffer top)
+        [g.slot_x_range()[0], g.waveguide_height + 0.5],# radiation (buffer side)
+        [2.0, 0.25],                                    # interior
+    ])
+    assert g.boundary_marker(pts).tolist() == [
+        "port_in", "port_out", "pec", "pec", "radiation", "radiation", "interior"
+    ]
+
+
+def test_boundary_marker_pec_radiation_disjoint():
+    g = RadiationSlotGeometry()
+    pts = g.build_dde_geometry().random_boundary_points(500)
+    labels = g.boundary_marker(pts)
+    assert not ((labels == "pec") & (labels == "radiation")).any()
+    assert (labels != "interior").all()

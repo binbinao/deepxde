@@ -55,3 +55,45 @@ class RadiationSlotGeometry:
             & (X <= x_hi + 1e-12)
         )
         return X, Y, in_wg | in_buf
+
+    def boundary_marker(self, x: np.ndarray, atol: float = 1e-9) -> np.ndarray:
+        """Classify points (N, 2) into one of:
+        ``{'port_in', 'port_out', 'pec', 'radiation', 'interior'}``.
+
+        Order of precedence: ports first (so they win over PEC at the bottom
+        corners), then PEC walls, then radiation. Anything else is interior.
+        """
+        x = np.atleast_2d(x)
+        labels = np.full(x.shape[0], "interior", dtype=object)
+
+        wg_w, wg_h = self.waveguide_width, self.waveguide_height
+        buf_top = wg_h + self.buffer_height
+        slot_lo, slot_hi = self.slot_x_range()
+
+        on_x0 = np.isclose(x[:, 0], 0.0, atol=atol)
+        on_xL = np.isclose(x[:, 0], wg_w, atol=atol)
+        on_y0 = np.isclose(x[:, 1], 0.0, atol=atol)
+        on_yh = np.isclose(x[:, 1], wg_h, atol=atol)
+        on_yt = np.isclose(x[:, 1], buf_top, atol=atol)
+
+        in_wg_y = (x[:, 1] >= -atol) & (x[:, 1] <= wg_h + atol)
+        in_buf_x = (x[:, 0] >= slot_lo - atol) & (x[:, 0] <= slot_hi + atol)
+
+        # Ports — left/right vertical edges of the waveguide only.
+        labels[on_x0 & in_wg_y] = "port_in"
+        labels[on_xL & in_wg_y] = "port_out"
+
+        # PEC — waveguide top/bottom (excluding slot opening) + buffer side walls vs.
+        # 'radiation' below; here we only paint waveguide walls.
+        bottom = on_y0 & (x[:, 0] >= -atol) & (x[:, 0] <= wg_w + atol)
+        top_left = on_yh & (x[:, 0] < slot_lo - atol)
+        top_right = on_yh & (x[:, 0] > slot_hi + atol)
+        labels[bottom | top_left | top_right] = "pec"
+
+        # Radiation — buffer top wall + buffer left/right vertical walls.
+        on_buf_left = np.isclose(x[:, 0], slot_lo, atol=atol) & (x[:, 1] > wg_h + atol)
+        on_buf_right = np.isclose(x[:, 0], slot_hi, atol=atol) & (x[:, 1] > wg_h + atol)
+        on_buf_top = on_yt & in_buf_x
+        labels[on_buf_left | on_buf_right | on_buf_top] = "radiation"
+
+        return labels
