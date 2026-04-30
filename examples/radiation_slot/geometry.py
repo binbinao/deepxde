@@ -38,3 +38,20 @@ class RadiationSlotGeometry:
             [x_hi, self.waveguide_height + self.buffer_height],
         )
         return wg | buf
+
+    def fdfd_grid(self, mesh_size: float):
+        """Uniform Cartesian grid + boolean domain mask. Returns (X, Y, mask)."""
+        h = mesh_size
+        nx = int(round(self.waveguide_width / h)) + 1
+        ny = int(round((self.waveguide_height + self.buffer_height) / h)) + 1
+        x = np.linspace(0.0, self.waveguide_width, nx)
+        y = np.linspace(0.0, self.waveguide_height + self.buffer_height, ny)
+        X, Y = np.meshgrid(x, y, indexing="xy")
+        in_wg = Y <= self.waveguide_height + 1e-12
+        x_lo, x_hi = self.slot_x_range()
+        in_buf = (
+            (Y > self.waveguide_height + 1e-12)
+            & (X >= x_lo - 1e-12)
+            & (X <= x_hi + 1e-12)
+        )
+        return X, Y, in_wg | in_buf
