@@ -29,3 +29,22 @@ def test_ntff_uniform_aperture_main_lobe_at_zero():
     pat_db = 20 * np.log10(np.abs(pat) / np.max(np.abs(pat)))
     main_lobe_deg = np.rad2deg(theta[int(np.argmax(pat_db))])
     assert abs(main_lobe_deg) < 1.0
+
+
+def test_plot_field_writes_file(tmp_path):
+    from examples.radiation_slot.postprocess import plot_field
+    g = RadiationSlotGeometry()
+    X, Y, mask = g.fdfd_grid(0.1)
+    Ez = np.exp(-((X - 2) ** 2 + (Y - 0.25) ** 2)).astype(complex)
+    out = tmp_path / "field.png"
+    plot_field(Ez, X, Y, mask, str(out), title="dummy")
+    assert out.exists() and out.stat().st_size > 0
+
+
+def test_plot_radiation_pattern_writes_file(tmp_path):
+    from examples.radiation_slot.postprocess import plot_radiation_pattern
+    theta = np.linspace(-np.pi / 2, np.pi / 2, 181)
+    pat_db = -20 * np.abs(theta)
+    out = tmp_path / "pat.png"
+    plot_radiation_pattern(theta, pat_db, str(out), title="dummy")
+    assert out.exists() and out.stat().st_size > 0

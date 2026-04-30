@@ -48,3 +48,39 @@ def aperture_field(Ez, X, Y, geometry):
     x_lo, x_hi = geometry.slot_x_range()
     cols = np.where((X[j, :] >= x_lo - 1e-9) & (X[j, :] <= x_hi + 1e-9))[0]
     return X[j, cols], Ez[j, cols]
+
+
+def plot_field(Ez, X, Y, mask, save_path, title="|E_z|"):
+    """Heatmap of |Ez| over the CSG domain (cells outside mask shown as NaN)."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    amp = np.where(mask, np.abs(Ez), np.nan)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    pcm = ax.pcolormesh(X, Y, amp, shading="auto", cmap="viridis")
+    fig.colorbar(pcm, ax=ax, label="|E_z|")
+    ax.set_xlabel("x [cm]")
+    ax.set_ylabel("y [cm]")
+    ax.set_aspect("equal")
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
+
+
+def plot_radiation_pattern(theta, pattern_db, save_path, title="Radiation pattern"):
+    """Polar plot of normalized radiation pattern in dB."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(subplot_kw={"projection": "polar"}, figsize=(6, 6))
+    ax.plot(theta, pattern_db)
+    ax.set_theta_zero_location("N")
+    ax.set_theta_direction(-1)
+    ax.set_rlim(-40, max(0, np.max(pattern_db) + 1))
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(save_path, dpi=150)
+    plt.close(fig)
