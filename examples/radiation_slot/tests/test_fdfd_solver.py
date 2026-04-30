@@ -75,3 +75,12 @@ def test_mur_low_reflection(no_slot_geometry):
     inlet = np.isclose(X, 0.0)
     refl = np.linalg.norm(Ez[inlet] - Ez_inc[inlet]) / np.linalg.norm(Ez_inc[inlet])
     assert refl < 0.05, f"Mur reflection {refl:.3%} exceeds 5 %"
+
+
+def test_fdfd_with_slot_returns_finite_field():
+    g = RadiationSlotGeometry()
+    out = FDFDSolver(g, frequency_ghz=15.0, mesh_size=0.05).solve()
+    Ez, mask = out["Ez"], out["mask"]
+    inside = Ez[mask]
+    assert np.isfinite(inside).all()
+    assert 1e-2 < np.max(np.abs(inside)) < 1e3
