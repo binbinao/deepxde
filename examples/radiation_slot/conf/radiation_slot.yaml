@@ -1,0 +1,27 @@
+geometry:
+  waveguide_width: 4.0
+  waveguide_height: 1.5      # cm — TE10 cutoff dimension; 1.5 cm gives kx ≈ 2.34 rad/cm at 15 GHz
+  slot_length: 1.5
+  slot_width: 0.16
+  slot_position: 0.5
+  buffer_height: 1.5
+  medium_epsilon: 1.0
+  medium_mu: 1.0
+fdfd:
+  mesh_size: 0.05
+pinn:
+  hidden_layers: [256, 256, 256, 256]
+  activation: "tanh"
+  initializer: "Glorot uniform"
+  num_domain: 8000
+  num_boundary: 800
+  num_test: 5000
+  adam_iterations: 15000
+  adam_lr: 1.0e-3
+  lbfgs_max_iter: 5000
+  loss_weights: {pde: 1.0, pec: 100.0, mur: 100.0}
+frequencies:
+  default_ghz: 15.0
+  scan_start_ghz: 12.0
+  scan_stop_ghz: 18.0
+  scan_step_ghz: 0.5
