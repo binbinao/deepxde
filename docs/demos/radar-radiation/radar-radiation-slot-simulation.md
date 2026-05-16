@@ -35,19 +35,32 @@ todos:
 known_limitations:
   - id: pinn-convergence
     content: |
-      PINN 求解器在标准 Adam+L-BFGS 训练下未达到 spec §4.2 的定量精度阈值
-      （field L2 ≤ 5%, corrcoef ≥ 0.98）。FDFD 参考求解器、几何模块、后处理、
-      对比模块、28 个单元测试全部正常。这是 Helmholtz PINN 经典的 "trivial
-      boundary-layer minimum" 问题（BC 残差降到 1e-5，PDE 残差卡在 ~3e-3）。
-      已验证非维化 + sin 激活 + loss 权重调整后问题依然存在，扩大网络 4×256→6×512
-      也无改善，说明需要 RAR 自适应采样 / Fourier feature embedding / 硬约束
-      散射场分解等更高级方法。详见 examples/radiation_slot/README.md 的
-      "PINN Convergence — Known Limitation" 章节。
+      PINN 求解器在标准 Adam+L-BFGS + 单一 FNN 训练下未达到 spec §4.2 的所有
+      定量精度阈值（field L2 ≤ 5%, corrcoef ≥ 0.98, main-lobe Δ° ≤ 2°，
+      |S11| Δ ≤ 2 dB）。FDFD 参考求解器、几何模块、后处理、对比模块、31 个
+      单元测试全部正常。
+
+      已尝试的优化（详见 examples/radiation_slot/README.md "Optimized PINN Solver"
+      章节）:
+        - 非维化 ξ = k0·x   ✅ 全残差降到 O(1)
+        - sin 激活函数      ✅ 比 tanh 训练更稳
+        - loss_weights 调整 ✅ port_in 加权
+        - 散射场分解        独立无效，需配合 Fourier 才奏效
+        - Fourier features  独立无效，需配合 scattered 才奏效
+        - 散射 + Fourier 组合 ✅ 决定性突破：corrcoef -0.11→+0.84
+        - 加大 num_domain (V2)  ✅ 过拟合 16000×→688×
+
+      最佳实验（V2: scattered + Fourier=8 + num_domain=30k + 15k+5k iters）:
+        L2=0.66, corrcoef=0.82, main-lobe Δ°=-3.5° (spec ±2°),
+        |S11| Δ=3.3 dB (spec ±2 dB) — 主瓣方向几乎达标，
+        |S11| 接近达标，但 field-level L2 仍超 spec 阈值一个数量级。
+        剩余 gap 应由 RAR 自适应采样 / causal training 等更高级方法补足。
   - id: frequency-sweep
     content: |
       13 频点 Ku 波段扫描（main_scan.py, Task 16）未实现。FDFD 侧的扫描为
-      纯 Python 循环 + 现有 FDFDSolver 调用，trivially 可加；但 PINN 侧在
-      单频精度问题未解决前，跨频扫描会同等放大问题，故作为 follow-up 暂缓。
+      纯 Python 循环 + 现有 FDFDSolver 调用，trivially 可加；但 PINN 侧
+      单频精度仍在改进中，跨频扫描在 spec 阈值收紧前会同等放大问题，
+      故作为 follow-up 暂缓。
 spec: docs/superpowers/specs/2026-04-30-radar-radiation-slot-design.md
 plan: docs/superpowers/plans/2026-04-30-radar-radiation-slot.md
 readme: examples/radiation_slot/README.md
