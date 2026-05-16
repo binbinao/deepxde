@@ -32,12 +32,23 @@ todos:
     dependencies:
       - implement-postprocessing
       - create-comparator
+  - id: frequency-sweep
+    content: |
+      实现 main_scan.py 的 13 频点 Ku 波段扫描（12-18 GHz @ 0.5 GHz step）。
+      默认运行模式：FDFD 全量扫描（~7 秒）+ Optimized PINN 在用户指定单点
+      （默认 15 GHz）训练。`--no-pinn` 跳过 PINN，仅做 FDFD 频段曲线（最快）。
+      生成 s_parameters_scan.png（|S11|/|S21| vs f）+ pattern_overlay.png
+      （13 个方向图叠加，frequency-coloured）+ scan_summary.yaml。
+      实测 |S11| 显示两处强匹配带：12.5 GHz (-20.6 dB) 与 16.5-17 GHz (-25 to -26 dB)。
+    status: completed
+    dependencies:
+      - create-main-example
 known_limitations:
   - id: pinn-convergence
     content: |
       PINN 求解器在标准 Adam+L-BFGS + 单一 FNN 训练下未达到 spec §4.2 的所有
       定量精度阈值（field L2 ≤ 5%, corrcoef ≥ 0.98, main-lobe Δ° ≤ 2°，
-      |S11| Δ ≤ 2 dB）。FDFD 参考求解器、几何模块、后处理、对比模块、31 个
+      |S11| Δ ≤ 2 dB）。FDFD 参考求解器、几何模块、后处理、对比模块、33 个
       单元测试全部正常。
 
       已尝试的优化（详见 examples/radiation_slot/README.md "Optimized PINN Solver"
@@ -55,12 +66,9 @@ known_limitations:
         |S11| Δ=3.3 dB (spec ±2 dB) — 主瓣方向几乎达标，
         |S11| 接近达标，但 field-level L2 仍超 spec 阈值一个数量级。
         剩余 gap 应由 RAR 自适应采样 / causal training 等更高级方法补足。
-  - id: frequency-sweep
-    content: |
-      13 频点 Ku 波段扫描（main_scan.py, Task 16）未实现。FDFD 侧的扫描为
-      纯 Python 循环 + 现有 FDFDSolver 调用，trivially 可加；但 PINN 侧
-      单频精度仍在改进中，跨频扫描在 spec 阈值收紧前会同等放大问题，
-      故作为 follow-up 暂缓。
+
+      因 PINN 单频耗时 ~98 分钟，频段扫描 (frequency-sweep todo) 仅
+      在 FDFD 端 13 频点全跑（~7 秒），PINN 仅在用户指定的单频跑一次。
 spec: docs/superpowers/specs/2026-04-30-radar-radiation-slot-design.md
 plan: docs/superpowers/plans/2026-04-30-radar-radiation-slot.md
 readme: examples/radiation_slot/README.md
