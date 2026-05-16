@@ -265,13 +265,68 @@ not attempted in this set of experiments.
 
 ## Frequency Sweep (M6)
 
-The 13-point Ku-band sweep (12–18 GHz at 0.5 GHz steps) with PINN warm-starts
-is specified in the plan (Task 16 / `main_scan.py`) but not implemented, since
-the single-frequency PINN accuracy problem reported above would compound
-across frequencies without first being resolved. The FDFD side of the sweep
-is trivial to run in a Python loop with the existing `FDFDSolver` and
-`s_parameters()`; add a 20-line driver once the PINN convergence path is
-chosen.
+`main_scan.py` runs the **FDFD reference solver** across the full Ku band
+(12–18 GHz at 0.5 GHz steps, 13 points) and optionally trains the
+`OptimizedPINNSolver` at a single user-selected frequency for a side-by-side
+single-frequency comparison.
+
+```bash
+# FDFD-only sweep (≈ 7 seconds for 13 points)
+python3 -m examples.radiation_slot.main_scan --no-pinn
+
+# FDFD sweep + optimized PINN at 15 GHz (≈ 90 minutes additional)
+python3 -m examples.radiation_slot.main_scan --pinn-freq 15.0 \
+    --pinn-iters 15000 --pinn-lbfgs 5000
+
+# Different range / step
+python3 -m examples.radiation_slot.main_scan --no-pinn \
+    --f-start 13 --f-stop 17 --f-step 0.25
+```
+
+### Why FDFD-only sweep, PINN single-point
+
+`OptimizedPINNSolver` V2 takes ≈ 98 minutes per frequency on this machine,
+so a full 13-point PINN sweep would take ≈ 21 hours. FDFD costs ≈ 0.5
+seconds per frequency (sparse complex LU on an 81×71 grid), so the FDFD
+sweep finishes in well under a minute. The S-parameter / radiation-pattern
+curves over frequency therefore come from FDFD; the PINN is demonstrated
+at the single frequency the user picks via `--pinn-freq`.
+
+### Outputs (under `examples/radiation_slot/outputs/scan/`)
+
+| File | Contents |
+| --- | --- |
+| `s_parameters_scan.png` | \|S<sub>11</sub>\| / \|S<sub>21</sub>\| (dB) vs. frequency, FDFD |
+| `pattern_overlay.png` | All 13 normalized E-plane patterns superimposed, colored by frequency |
+| `scan_summary.yaml` | Tabular FDFD results + PINN single-point metrics if requested |
+| `field_{fdfd,pinn}_<f>GHz.png` | Field heatmaps at `--pinn-freq` (only when PINN is on) |
+| `pattern_{fdfd,pinn}_<f>GHz.png` | Polar patterns at `--pinn-freq` (only when PINN is on) |
+
+### Reference run
+
+A fresh sweep (`main_scan.py --no-pinn`, default geometry) yields the
+following \|S<sub>11</sub>\| profile, with the radiating slot exhibiting
+two strong matched bands near 12.5 GHz (−20.6 dB) and 16.5–17 GHz
+(−25 to −26 dB), and reflection peaking around 13.5 GHz (−11.4 dB):
+
+| Frequency [GHz] | \|S<sub>11</sub>\| [dB] | \|S<sub>21</sub>\| [dB] |
+| ---: | ---: | ---: |
+| 12.0 | −11.18 | −2.83 |
+| 12.5 | **−20.62** | −2.51 |
+| 13.0 | −12.06 | −2.98 |
+| 13.5 | −11.36 | −3.24 |
+| 14.0 | −12.91 | −3.23 |
+| 14.5 | −15.14 | −3.13 |
+| 15.0 | −16.07 | −3.02 |
+| 15.5 | −16.36 | −2.90 |
+| 16.0 | −18.44 | −2.75 |
+| 16.5 | **−26.07** | −2.59 |
+| 17.0 | **−25.41** | −2.48 |
+| 17.5 | −16.25 | −2.45 |
+| 18.0 | −12.64 | −2.42 |
+
+The corresponding curves and the 13-point pattern overlay are committed-out
+artifacts; re-running `main_scan.py --no-pinn` regenerates them in seconds.
 
 ## References
 
