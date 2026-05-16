@@ -186,6 +186,83 @@ Users wanting a *working* 2D Helmholtz reference for this geometry should use
 techniques can use `PINNSolver` as the starting baseline and plug in one of
 the five directions above.
 
+## Optimized PINN Solver
+
+`pinn_solver_optimized.py` ships an `OptimizedPINNSolver` that combines the
+first two remediation directions from the list above:
+
+1. **Scattered-field decomposition** — total field $E_z = E_z^{inc} + E_z^{sc}$
+   where $E_z^{inc}$ is the analytical TE10 traveling wave; the network only
+   learns $E_z^{sc}$. This folds the port_in source term into the analytical
+   incident, replacing it with a non-zero radiation BC RHS that prevents the
+   trivial $E_z^{sc} = 0$ collapse.
+
+2. **Fourier-feature input embedding** — the (ξ, η) coordinates are passed
+   through $[\sin(m\xi), \cos(m\xi), \sin(m\eta), \cos(m\eta)]$ for $m = 1..M$
+   before the FNN, providing oscillatory basis functions for the high-frequency
+   solution.
+
+Both knobs are independently configurable. `predict_on_grid` still returns
+the *total* physical $E_z$, so `main.py` and the postprocess/comparator stack
+work unchanged.
+
+### Ablation (3k Adam + 1k L-BFGS @ 15 GHz, default geometry)
+
+| Configuration | L2 | corrcoef | main-lobe Δ° |
+| --- | ---: | ---: | ---: |
+| Baseline (no Fourier, no scattered) | 1.17 | −0.11 | +56° |
+| Scattered only | 1.21 | −0.06 | +84° |
+| Fourier only ($M = 6$) | 1.06 | −0.02 | +32° |
+| **Fourier + scattered** | **0.63** | **+0.84** | **−14°** |
+
+Either knob alone is essentially ineffective; **the two together** flip the
+correlation coefficient from negative to strongly positive. The Fourier
+features give the network the basis it needs to express oscillatory solutions
+while the scattered decomposition removes the trivial-solution local minimum
+that traps standard training.
+
+To reproduce: `python3 -m examples.radiation_slot.experiments.ab_compare`.
+
+### Extended training results
+
+Two extended runs at 15 GHz with the full optimization stack:
+
+| Run | Fourier $M$ | num_domain | Adam + L-BFGS | L2 | corrcoef | main-lobe Δ° | \|S<sub>11</sub>\| Δ dB | test/train |
+| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| V1 | 12 | 8 000 | 15k + 5k | 0.71 | +0.77 | +99.5° | 1.86 | 16 000× ⚠ |
+| **V2** | **8** | **30 000** | **15k + 5k** | **0.66** | **+0.82** | **−3.5°** | **3.26** | **688×** |
+
+V2 was tuned in response to V1's severe overfitting (test_loss / train_loss
+≈ 16 000×). Quadrupling the domain training points and reducing the Fourier
+embedding to $M = 8$ brought the ratio down by ~23×; the V1 |S<sub>11</sub>|
+score below 2 dB was a coincidental product of overfitting and is not
+replicated in V2's more genuine generalization.
+
+The most physically meaningful indicator — the far-field main-lobe direction —
+went from completely wrong in V1 (+99.5° off-axis) to within −3.5° of the
+FDFD reference in V2, just outside the spec tolerance of ±2°.
+
+To reproduce V2: `python3 -m examples.radiation_slot.experiments.run_v2_fourier8_dom30k`
+(allow ~90 minutes on a single GPU).
+
+### Status against spec §4.2
+
+| Metric | Spec gate | V2 result | Notes |
+| --- | --- | --- | --- |
+| Field L2 relative | ≤ 0.05 | 0.66 | ❌ open |
+| Field correlation | ≥ 0.98 | 0.82 | ❌ open |
+| Main-lobe Δ° | ≤ 2° | 3.5° | ⚠ near miss |
+| \|S<sub>11</sub>\| Δ dB | ≤ 2 dB | 3.3 dB | ⚠ near miss |
+
+V2 closes most of the gap on physically dominant integrated quantities
+(main lobe, $|S_{11}|$). The remaining gap on local field metrics (L2 and
+correlation) is consistent with the Fourier-feature embedding capturing the
+dominant modes but missing finer spatial structure. The remaining headroom
+should come from the next remediation directions in this README's
+"Directions that would likely close the gap" list — particularly **RAR**
+(residual-based adaptive refinement) and **causal training**, which were
+not attempted in this set of experiments.
+
 ## Frequency Sweep (M6)
 
 The 13-point Ku-band sweep (12–18 GHz at 0.5 GHz steps) with PINN warm-starts
